@@ -48,6 +48,7 @@ Fluxo:
 | `/vincular` | Vincula o Discord ao nick AQW |
 | `/desvincular` | Remove a vinculação |
 | `/perfil` | Mostra o perfil AQW interativo |
+| `/historico` | Exibe snapshots simples de progresso do usuário |
 | `/farms` | Lista farms monitoradas detectadas |
 | `/metas` | Recomenda próximos objetivos endgame |
 | `/classes` | Lista classes e ranks detectados |
@@ -56,6 +57,8 @@ Fluxo:
 | `/ultras` | Monitora progresso de ultras |
 | `/comparar` | Compara dois perfis vinculados |
 | `/rankingfarms` | Ranking do servidor por farms detectadas |
+| `/topclasses` | Ranking do servidor pelas melhores classes detectadas |
+| `/rankingbadges` | Ranking do servidor por badges públicas |
 | `/guildaqw` | Resumo lado a lado dos vinculados no servidor |
 | `/ping` | Latência do bot |
 | `/help` | Menu de ajuda |
@@ -114,6 +117,24 @@ A Char Page pública da Artix expõe `Inventory` e `Badges`, mas não expõe um 
 - a análise atual é baseada apenas em inventário, equips e badges públicos.
 
 Se no futuro surgir um endpoint público estável de `Bank`, o bot pode ser expandido para isso.
+
+## Cache e histórico
+
+O bot usa cache em memória por nickname para evitar consultas repetidas e reduzir o custo das leituras públicas da Char Page.
+
+Variáveis úteis:
+
+- `AQW_PROFILE_CACHE_TTL`: tempo de vida do cache de perfil em segundos
+- `AQW_HISTORY_MIN_INTERVAL`: intervalo mínimo entre snapshots idênticos do mesmo usuário
+
+Também há um histórico simples por usuário vinculado, salvo em SQLite, com:
+
+- level;
+- total de itens públicos;
+- total de badges públicas;
+- farms detectadas;
+- ultras detectadas;
+- melhor classe detectada.
 
 ## Stack
 

@@ -103,6 +103,22 @@ class AccountLink:
     updated_at: str
 
 
+@dataclass(slots=True)
+class ProfileSnapshot:
+    discord_user_id: int
+    aqw_nickname: str
+    level: int
+    inventory_total: int
+    badge_total: int
+    farm_total: int
+    ultra_total: int
+    class_total: int
+    top_class_name: str
+    top_class_rank: int
+    recorded_at: str
+    source: str
+
+
 @dataclass(frozen=True, slots=True)
 class FarmDefinition:
     name: str
@@ -422,6 +438,7 @@ class AccountLinkRepository:
         self._lock = Lock()
         self._connection = sqlite3.connect(self.db_path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
+        self.snapshot_min_interval = int(os.getenv("AQW_HISTORY_MIN_INTERVAL", "10800"))
         self._setup()
 
     def _setup(self) -> None:
@@ -442,6 +459,31 @@ class AccountLinkRepository:
                 """
                 CREATE INDEX IF NOT EXISTS idx_linked_accounts_nickname
                 ON linked_accounts(aqw_nickname_normalized)
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS profile_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    discord_user_id INTEGER NOT NULL,
+                    aqw_nickname TEXT NOT NULL,
+                    level INTEGER NOT NULL,
+                    inventory_total INTEGER NOT NULL,
+                    badge_total INTEGER NOT NULL,
+                    farm_total INTEGER NOT NULL,
+                    ultra_total INTEGER NOT NULL,
+                    class_total INTEGER NOT NULL,
+                    top_class_name TEXT NOT NULL,
+                    top_class_rank INTEGER NOT NULL,
+                    recorded_at TEXT NOT NULL,
+                    source TEXT NOT NULL
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_profile_snapshots_user_time
+                ON profile_snapshots(discord_user_id, recorded_at DESC)
                 """
             )
             self._connection.commit()
@@ -466,7 +508,7 @@ class AccountLinkRepository:
 
             current = self._connection.execute(
                 """
-                SELECT created_at
+                SELECT created_at, aqw_nickname_normalized
                 FROM linked_accounts
                 WHERE discord_user_id = ?
                 """,
@@ -474,6 +516,7 @@ class AccountLinkRepository:
             ).fetchone()
 
             created_at = current["created_at"] if current else now
+            nickname_changed = bool(current and current["aqw_nickname_normalized"] != normalized)
 
             self._connection.execute(
                 """
@@ -494,6 +537,11 @@ class AccountLinkRepository:
                 """,
                 (user.id, discord_name, aqw_nickname, normalized, created_at, now),
             )
+            if nickname_changed:
+                self._connection.execute(
+                    "DELETE FROM profile_snapshots WHERE discord_user_id = ?",
+                    (user.id,),
+                )
             self._connection.commit()
 
             row = self._connection.execute(
@@ -511,6 +559,10 @@ class AccountLinkRepository:
         with self._lock:
             cursor = self._connection.execute(
                 "DELETE FROM linked_accounts WHERE discord_user_id = ?",
+                (user_id,),
+            )
+            self._connection.execute(
+                "DELETE FROM profile_snapshots WHERE discord_user_id = ?",
                 (user_id,),
             )
             self._connection.commit()
@@ -539,6 +591,95 @@ class AccountLinkRepository:
             ).fetchall()
         return [self._row_to_link(row) for row in rows]
 
+    def record_snapshot(self, link: AccountLink, character: AQWCharacterData, source: str) -> bool:
+        stats = profile_stats(character)
+        farms = len([farm for farm in detect_farms(character) if farm.completed])
+        ultras = len([ultra for ultra in detect_ultras(character) if ultra.completed])
+        classes = ranked_classes(character)
+        top_class_name = classes[0][0] if classes else "Nenhuma"
+        top_class_rank = classes[0][1] if classes else 0
+        level_value = parse_level(character.level)
+        now = utc_now_iso()
+
+        with self._lock:
+            latest = self._connection.execute(
+                """
+                SELECT *
+                FROM profile_snapshots
+                WHERE discord_user_id = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (link.discord_user_id,),
+            ).fetchone()
+
+            if latest:
+                same_metrics = (
+                    latest["aqw_nickname"] == character.display_name
+                    and latest["level"] == level_value
+                    and latest["inventory_total"] == stats["inventory_total"]
+                    and latest["badge_total"] == stats["badge_total"]
+                    and latest["farm_total"] == farms
+                    and latest["ultra_total"] == ultras
+                    and latest["class_total"] == stats["class_total"]
+                    and latest["top_class_name"] == top_class_name
+                    and latest["top_class_rank"] == top_class_rank
+                )
+                last_recorded = datetime.fromisoformat(latest["recorded_at"])
+                elapsed = (datetime.now(timezone.utc) - last_recorded).total_seconds()
+                if same_metrics and elapsed < self.snapshot_min_interval:
+                    return False
+
+            self._connection.execute(
+                """
+                INSERT INTO profile_snapshots (
+                    discord_user_id,
+                    aqw_nickname,
+                    level,
+                    inventory_total,
+                    badge_total,
+                    farm_total,
+                    ultra_total,
+                    class_total,
+                    top_class_name,
+                    top_class_rank,
+                    recorded_at,
+                    source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    link.discord_user_id,
+                    character.display_name,
+                    level_value,
+                    stats["inventory_total"],
+                    stats["badge_total"],
+                    farms,
+                    ultras,
+                    stats["class_total"],
+                    top_class_name,
+                    top_class_rank,
+                    now,
+                    source,
+                ),
+            )
+            self._connection.commit()
+            return True
+
+    def list_recent_snapshots(self, user_id: int, limit: int = 8) -> list[ProfileSnapshot]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT *
+                FROM profile_snapshots
+                WHERE discord_user_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+        return [self._row_to_snapshot(row) for row in rows]
+
     @staticmethod
     def _row_to_link(row: sqlite3.Row) -> AccountLink:
         return AccountLink(
@@ -547,6 +688,23 @@ class AccountLinkRepository:
             aqw_nickname=row["aqw_nickname"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    def _row_to_snapshot(row: sqlite3.Row) -> ProfileSnapshot:
+        return ProfileSnapshot(
+            discord_user_id=row["discord_user_id"],
+            aqw_nickname=row["aqw_nickname"],
+            level=row["level"],
+            inventory_total=row["inventory_total"],
+            badge_total=row["badge_total"],
+            farm_total=row["farm_total"],
+            ultra_total=row["ultra_total"],
+            class_total=row["class_total"],
+            top_class_name=row["top_class_name"],
+            top_class_rank=row["top_class_rank"],
+            recorded_at=row["recorded_at"],
+            source=row["source"],
         )
 
 
@@ -614,6 +772,11 @@ class AQWCharacterService:
         }
         self._cache: dict[str, tuple[float, AQWCharacterData]] = {}
         self._cache_lock = Lock()
+
+    def invalidate_character_cache(self, nickname: str) -> None:
+        cache_key = normalize_lookup_token(nickname)
+        with self._cache_lock:
+            self._cache.pop(cache_key, None)
 
     def fetch_character(
         self,
@@ -1026,7 +1189,13 @@ class AQWCharacterService:
                 colors = sample.getcolors(maxcolors=64 * 64) or []
                 unique_count = len(colors) if colors else 4096
                 dominant_ratio = (max((count for count, _ in colors), default=0) / (64 * 64)) if colors else 0
-                non_flat = sum(1 for pixel in sample.getdata() if sum(pixel) / 3 < 252)
+                pixels = sample.load()
+                non_flat = sum(
+                    1
+                    for y in range(sample.height)
+                    for x in range(sample.width)
+                    if sum(pixels[x, y]) / 3 < 252
+                )
 
                 return (
                     avg_std >= 15
@@ -1092,12 +1261,29 @@ def profile_stats(character: AQWCharacterData) -> dict[str, int]:
     }
 
 
+def class_leaderboard_metrics(character: AQWCharacterData) -> tuple[int, int, int, str]:
+    classes = ranked_classes(character)
+    best_rank = classes[0][1] if classes else 0
+    total_points = sum(points for _, _, points in classes)
+    class_total = len(classes)
+    top_class_name = classes[0][0] if classes else "Nenhuma"
+    return best_rank, class_total, total_points, top_class_name
+
+
 def inventory_type_counts(character: AQWCharacterData) -> Counter[str]:
     return Counter(item.get("strType", "Outros") for item in character.inventory)
 
 
 def badge_category_counts(character: AQWCharacterData) -> Counter[str]:
     return Counter(badge.category for badge in character.badges)
+
+
+def format_snapshot_label(recorded_at: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(recorded_at).astimezone()
+        return parsed.strftime("%d/%m %H:%M")
+    except ValueError:
+        return recorded_at.replace("T", " ")[:16]
 
 
 def build_search_pool(character: AQWCharacterData) -> list[tuple[str, str, str]]:
@@ -1829,6 +2015,67 @@ def build_ultras_embed(character: AQWCharacterData, target_user: discord.abc.Use
     return embed
 
 
+def build_history_embed(
+    target_user: discord.abc.User,
+    link: AccountLink,
+    snapshots: list[ProfileSnapshot],
+) -> discord.Embed:
+    latest = snapshots[0] if snapshots else None
+    oldest = snapshots[-1] if len(snapshots) > 1 else latest
+
+    embed = discord.Embed(
+        title=f"Historico AQW de {safe_user_display(target_user)}",
+        description=(
+            f"**Conta AQW:** {link.aqw_nickname}\n"
+            f"**Snapshots registrados:** {len(snapshots)}"
+        ),
+        color=discord.Color.dark_gold(),
+    )
+    embed.set_author(name=safe_user_display(target_user), icon_url=target_user.display_avatar.url)
+
+    if latest:
+        delta_level = latest.level - (oldest.level if oldest else latest.level)
+        delta_badges = latest.badge_total - (oldest.badge_total if oldest else latest.badge_total)
+        delta_farms = latest.farm_total - (oldest.farm_total if oldest else latest.farm_total)
+        delta_ultras = latest.ultra_total - (oldest.ultra_total if oldest else latest.ultra_total)
+
+        embed.add_field(
+            name="Resumo de progresso",
+            value=build_field_value(
+                [
+                    f"- Ultimo registro: {format_snapshot_label(latest.recorded_at)} via {latest.source}",
+                    f"- Level: {latest.level} ({delta_level:+d})",
+                    f"- Badges publicas: {latest.badge_total} ({delta_badges:+d})",
+                    f"- Farms detectadas: {latest.farm_total} ({delta_farms:+d})",
+                    f"- Ultras detectadas: {latest.ultra_total} ({delta_ultras:+d})",
+                    f"- Classes detectadas: {latest.class_total}",
+                    f"- Melhor classe: {latest.top_class_name} (Rank {latest.top_class_rank})",
+                ]
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Timeline recente",
+            value=build_field_value(
+                [
+                    f"- {format_snapshot_label(snapshot.recorded_at)} | Lv {snapshot.level} | Badges {snapshot.badge_total} | Farms {snapshot.farm_total} | Ultras {snapshot.ultra_total}"
+                    for snapshot in snapshots
+                ],
+                fallback="Ainda nao ha snapshots suficientes para exibir a timeline.",
+            ),
+            inline=False,
+        )
+    else:
+        embed.add_field(
+            name="Sem historico ainda",
+            value="O bot ainda nao registrou snapshots suficientes desse usuario.",
+            inline=False,
+        )
+
+    embed.add_field(name="Status do Bank", value=public_bank_status_text(), inline=False)
+    return embed
+
+
 async def resolve_guild_linked_members(
     guild: discord.Guild,
 ) -> list[tuple[discord.Member, AccountLink]]:
@@ -1862,6 +2109,7 @@ async def gather_linked_guild_profiles(
                     False,
                     False,
                 )
+                await asyncio.to_thread(link_repository.record_snapshot, link, character, "guild-scan")
             except Exception:
                 logger.exception("Falha ao montar perfil AQW vinculado de %s (%s).", member.display_name, member.id)
                 return None
@@ -1904,6 +2152,77 @@ def build_rankingfarms_embed(
     embed.add_field(
         name="Top progresso",
         value=build_field_value(lines, fallback="Nenhum usuario vinculado encontrado nesta guild."),
+        inline=False,
+    )
+    embed.add_field(name="Status do Bank", value=public_bank_status_text(), inline=False)
+    return embed
+
+
+def build_topclasses_embed(
+    guild: discord.Guild,
+    entries: list[tuple[discord.Member, AccountLink, AQWCharacterData]],
+) -> discord.Embed:
+    ranking = []
+    for member, _, character in entries:
+        best_rank, class_total, total_points, top_class_name = class_leaderboard_metrics(character)
+        ranking.append((member, character, best_rank, class_total, total_points, top_class_name))
+
+    ranking.sort(
+        key=lambda entry: (
+            -entry[2],
+            -entry[3],
+            -entry[4],
+            entry[1].display_name.lower(),
+        )
+    )
+
+    embed = discord.Embed(
+        title=f"Top classes - {guild.name}",
+        description=f"Usuarios vinculados avaliados: {len(ranking)}",
+        color=discord.Color.dark_magenta(),
+    )
+    embed.add_field(
+        name="Ranking de classes",
+        value=build_field_value(
+            [
+                f"- #{index} {member.display_name} -> {character.display_name} | Melhor classe {top_class_name} (Rank {best_rank}) | Classes {class_total}"
+                for index, (member, character, best_rank, class_total, _, top_class_name) in enumerate(ranking[:15], start=1)
+            ],
+            fallback="Nenhum usuario vinculado encontrado nesta guild.",
+        ),
+        inline=False,
+    )
+    embed.add_field(name="Status do Bank", value=public_bank_status_text(), inline=False)
+    return embed
+
+
+def build_badges_ranking_embed(
+    guild: discord.Guild,
+    entries: list[tuple[discord.Member, AccountLink, AQWCharacterData]],
+) -> discord.Embed:
+    ranking = sorted(
+        entries,
+        key=lambda entry: (
+            -len(entry[2].badges),
+            -len([farm for farm in detect_farms(entry[2]) if farm.completed]),
+            entry[2].display_name.lower(),
+        ),
+    )
+
+    embed = discord.Embed(
+        title=f"Ranking de badges - {guild.name}",
+        description=f"Usuarios vinculados avaliados: {len(ranking)}",
+        color=discord.Color.green(),
+    )
+    embed.add_field(
+        name="Top badges publicas",
+        value=build_field_value(
+            [
+                f"- #{index} {member.display_name} -> {character.display_name} | Badges {len(character.badges)} | Categoria lider {badge_category_counts(character).most_common(1)[0][0] if character.badges else 'Nenhuma'}"
+                for index, (member, _, character) in enumerate(ranking[:15], start=1)
+            ],
+            fallback="Nenhum usuario vinculado encontrado nesta guild.",
+        ),
         inline=False,
     )
     embed.add_field(name="Status do Bank", value=public_bank_status_text(), inline=False)
@@ -1955,6 +2274,7 @@ async def resolve_linked_profile(
         False,
         force_refresh,
     )
+    await asyncio.to_thread(link_repository.record_snapshot, link, character, "profile")
     return link, character
 
 
@@ -2066,9 +2386,14 @@ class AQWProfileView(discord.ui.View):
 
     def _set_button_styles(self) -> None:
         for child in self.children:
-            if isinstance(child, discord.ui.Button) and child.custom_id and child.custom_id.startswith("profile:section:"):
+            if not isinstance(child, discord.ui.Button) or not child.custom_id:
+                continue
+
+            if child.custom_id.startswith("profile:section:"):
                 section = child.custom_id.split(":")[-1]
                 child.style = discord.ButtonStyle.primary if section == self.current_section else discord.ButtonStyle.secondary
+            elif child.custom_id == "profile:history":
+                child.style = discord.ButtonStyle.primary if self.current_section == "history" else discord.ButtonStyle.secondary
 
     async def _switch_section(self, interaction: discord.Interaction, section: str) -> None:
         self.current_section = section
@@ -2095,6 +2420,14 @@ class AQWProfileView(discord.ui.View):
     async def classes_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await self._switch_section(interaction, "classes")
 
+    @discord.ui.button(label="Historico", style=discord.ButtonStyle.secondary, custom_id="profile:history", row=2)
+    async def history_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        snapshots = link_repository.list_recent_snapshots(self.target_user.id, limit=8)
+        embed = build_history_embed(self.target_user, self.link, snapshots)
+        self.current_section = "history"
+        self._set_button_styles()
+        await interaction.response.edit_message(embed=embed, view=self)
+
     @discord.ui.button(label="Ultras", style=discord.ButtonStyle.secondary, custom_id="profile:section:ultras", row=0)
     async def ultras_button(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await self._switch_section(interaction, "ultras")
@@ -2113,6 +2446,7 @@ class AQWProfileView(discord.ui.View):
                 False,
                 True,
             )
+            await asyncio.to_thread(link_repository.record_snapshot, self.link, refreshed, "refresh")
             self.character = refreshed
             self.embeds = build_profile_embeds(
                 refreshed,
@@ -2286,6 +2620,7 @@ async def help_command(interaction: discord.Interaction) -> None:
                 "- /farms: mostra farms monitoradas do perfil.",
                 "- /metas: recomenda proximas metas endgame.",
                 "- /classes: detalha classes e ranks detectados.",
+                "- /historico: exibe snapshots simples de progresso do usuario.",
                 "- /ultras: mostra progresso em metas ligadas a ultras.",
                 "- /conquistas: lista badges publicas.",
                 "- /buscaritem: procura itens, badges e equipados no perfil publico.",
@@ -2298,6 +2633,8 @@ async def help_command(interaction: discord.Interaction) -> None:
         value=build_field_value(
             [
                 "- /rankingfarms: rankeia os vinculados do servidor por farms detectadas.",
+                "- /topclasses: ranking de classes por servidor.",
+                "- /rankingbadges: ranking de badges publicas por servidor.",
                 "- /guildaqw: lista membros vinculados com resumo lado a lado.",
             ]
         ),
@@ -2342,6 +2679,7 @@ async def vincular(interaction: discord.Interaction, nickname: str) -> None:
             force_refresh=True,
         )
         link = link_repository.upsert_link(interaction.user, character.display_name)
+        await asyncio.to_thread(link_repository.record_snapshot, link, character, "link")
 
         embed = discord.Embed(
             title="Conta vinculada com sucesso",
@@ -2394,10 +2732,13 @@ async def vincular(interaction: discord.Interaction, nickname: str) -> None:
 
 @bot.tree.command(name="desvincular", description="Remove a vinculacao atual da sua conta AQW.")
 async def desvincular(interaction: discord.Interaction) -> None:
+    existing = link_repository.get_link(interaction.user.id)
     removed = link_repository.remove_link(interaction.user.id)
     art_path = profile_art_path_for_user(interaction.user.id)
     if art_path.exists():
         art_path.unlink(missing_ok=True)
+    if existing:
+        aqw_service.invalidate_character_cache(existing.aqw_nickname)
     if removed:
         await interaction.response.send_message("Sua conta AQW foi desvinculada com sucesso.", ephemeral=True)
     else:
@@ -2436,6 +2777,29 @@ async def perfil(interaction: discord.Interaction, usuario: Optional[discord.Use
             content="Ocorreu um erro inesperado ao montar o perfil.",
             embed=None,
             view=None,
+        )
+
+
+@bot.tree.command(name="historico", description="Exibe um historico simples de progresso do perfil AQW vinculado.")
+@app_commands.describe(usuario="Usuario do Discord vinculado ao AQW")
+async def historico(interaction: discord.Interaction, usuario: Optional[discord.User] = None) -> None:
+    target = usuario or interaction.user
+    await interaction.response.defer(thinking=True)
+
+    try:
+        link, character = await resolve_linked_profile(target)
+        # Garante snapshot recente antes de exibir o historico.
+        await asyncio.to_thread(link_repository.record_snapshot, link, character, "history")
+        snapshots = link_repository.list_recent_snapshots(target.id, limit=8)
+        embed = build_history_embed(target, link, snapshots)
+        await interaction.edit_original_response(embed=embed)
+    except AQWCharacterUnavailable as exc:
+        await interaction.edit_original_response(content=str(exc), embed=None)
+    except Exception:
+        logger.exception("Erro inesperado no /historico.")
+        await interaction.edit_original_response(
+            content="Nao consegui montar o historico agora.",
+            embed=None,
         )
 
 
@@ -2598,6 +2962,52 @@ async def rankingfarms(interaction: discord.Interaction) -> None:
         logger.exception("Erro inesperado no /rankingfarms.")
         await interaction.edit_original_response(
             content="Nao consegui montar o ranking de farms agora.",
+            embed=None,
+        )
+
+
+@bot.tree.command(name="topclasses", description="Rankeia os usuarios vinculados do servidor pelas classes detectadas.")
+async def topclasses(interaction: discord.Interaction) -> None:
+    if interaction.guild is None:
+        await interaction.response.send_message(
+            "Esse comando so pode ser usado dentro de um servidor.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(thinking=True)
+
+    try:
+        entries = await gather_linked_guild_profiles(interaction.guild)
+        embed = build_topclasses_embed(interaction.guild, entries)
+        await interaction.edit_original_response(embed=embed)
+    except Exception:
+        logger.exception("Erro inesperado no /topclasses.")
+        await interaction.edit_original_response(
+            content="Nao consegui montar o ranking de classes agora.",
+            embed=None,
+        )
+
+
+@bot.tree.command(name="rankingbadges", description="Rankeia os usuarios vinculados do servidor pelas badges publicas.")
+async def rankingbadges(interaction: discord.Interaction) -> None:
+    if interaction.guild is None:
+        await interaction.response.send_message(
+            "Esse comando so pode ser usado dentro de um servidor.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.defer(thinking=True)
+
+    try:
+        entries = await gather_linked_guild_profiles(interaction.guild)
+        embed = build_badges_ranking_embed(interaction.guild, entries)
+        await interaction.edit_original_response(embed=embed)
+    except Exception:
+        logger.exception("Erro inesperado no /rankingbadges.")
+        await interaction.edit_original_response(
+            content="Nao consegui montar o ranking de badges agora.",
             embed=None,
         )
 
