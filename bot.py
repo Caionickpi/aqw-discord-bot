@@ -119,12 +119,29 @@ class ProfileSnapshot:
     source: str
 
 
+@dataclass(slots=True)
+class ObservedItem:
+    discord_user_id: int
+    aqw_nickname: str
+    item_name: str
+    item_type: str
+    source_kind: str
+    max_count: int
+    is_ac: bool
+    is_member: bool
+    first_seen_at: str
+    last_seen_at: str
+    seen_times: int
+
+
 @dataclass(frozen=True, slots=True)
 class FarmDefinition:
     name: str
     category: str
     terms: tuple[str, ...]
     note: str
+    priority: int = 50
+    tier: str = "A"
 
 
 @dataclass(slots=True)
@@ -136,58 +153,86 @@ class FarmStatus:
 
 
 FARM_DEFINITIONS: tuple[FarmDefinition, ...] = (
-    FarmDefinition("Legion Revenant", "Classes de farm", ("Legion Revenant",), "Classe endgame de Legion."),
-    FarmDefinition("Void Highlord", "Classes de farm", ("Void Highlord",), "Classe de Nulgath muito visada."),
-    FarmDefinition("ArchMage", "Classes de farm", ("ArchMage",), "Classe caster endgame."),
-    FarmDefinition("Dragon of Time", "Classes de farm", ("Dragon of Time",), "Classe ligada a historia e farms longos."),
-    FarmDefinition("Chaos Avenger", "Classes de farm", ("Chaos Avenger",), "Classe ultra/endgame."),
-    FarmDefinition("Lord of Order", "Classes de farm", ("Lord of Order",), "Classe de suporte chave."),
-    FarmDefinition("LightCaster", "Classes de farm", ("LightCaster",), "Classe iconica baseada em LightMage."),
-    FarmDefinition("Yami no Ronin", "Classes de farm", ("Yami no Ronin", "YnR"), "Classe de dodge/meta."),
-    FarmDefinition("StoneCrusher", "Classes de farm", ("StoneCrusher",), "Classe utilitaria muito usada."),
+    FarmDefinition("Legion Revenant", "Classes de farm", ("Legion Revenant",), "Classe de farm/meta ainda central no endgame.", 100, "S"),
+    FarmDefinition("Lord of Order", "Classes de farm", ("Lord of Order",), "Suporte de altissima utilidade para grupos, ultras e progressao.", 98, "S"),
+    FarmDefinition("ArchMage", "Classes de farm", ("ArchMage",), "Classe caster endgame forte para farm e conteudo geral.", 97, "S"),
+    FarmDefinition("Void Highlord", "Classes de farm", ("Void Highlord",), "Classe de Nulgath ainda muito respeitada para dano e solo.", 95, "S"),
+    FarmDefinition("Chaos Avenger", "Classes de farm", ("Chaos Avenger",), "Classe ultra/endgame de alto valor para conta principal.", 94, "S"),
+    FarmDefinition("Dragon of Time", "Classes de farm", ("Dragon of Time",), "Classe forte e util, ligada a uma progressao longa.", 90, "A"),
+    FarmDefinition("ArchPaladin", "Classes de farm", ("ArchPaladin",), "Classe defensiva essencial para varias lutas e comps.", 89, "A"),
+    FarmDefinition("LightCaster", "Classes de farm", ("LightCaster",), "Classe iconica de dano consistente e boa progressao.", 86, "A"),
+    FarmDefinition("Yami no Ronin", "Classes de farm", ("Yami no Ronin", "YnR"), "Classe de dodge e utilidade muito relevante.", 85, "A"),
+    FarmDefinition("StoneCrusher", "Classes de farm", ("StoneCrusher",), "Classe utilitaria e suporte recorrente em grupos.", 82, "A"),
+    FarmDefinition("Arcana Invoker", "Classes de farm", ("Arcana Invoker",), "Classe endgame moderna de alto impacto para conta avancada.", 80, "A"),
     FarmDefinition(
         "Blinding Light of Destiny",
         "Armas e equipamentos",
         ("Blinding Light of Destiny", "BLoD"),
-        "Arma de farm classica do AQW.",
+        "Arma classica e ainda excelente marco de progresso da conta.",
+        88,
+        "A",
     ),
     FarmDefinition(
         "Necrotic Sword of Doom",
         "Armas e equipamentos",
         ("Necrotic Sword of Doom", "NSoD"),
-        "Uma das farms mais famosas e longas do jogo.",
+        "Uma das farms mais famosas e longas do jogo; marco de conta endgame.",
+        100,
+        "S",
     ),
     FarmDefinition(
         "Sepulchure's DoomKnight Armor",
         "Armas e equipamentos",
         ("Sepulchure's DoomKnight Armor", "SDKA"),
-        "Armor chave para varias progressões ligadas a Doom.",
+        "Armor chave para varias progressoes ligadas a Doom e atalho para farms futuras.",
+        93,
+        "S",
     ),
     FarmDefinition(
         "Exalted Apotheosis",
         "Armas e equipamentos",
         ("Exalted Apotheosis",),
-        "Arma vinculada a ultras/endgame moderno.",
+        "Arma vinculada a ultras e excelente milestone de conta.",
+        96,
+        "S",
+    ),
+    FarmDefinition(
+        "Head of the Legion Beast",
+        "Boosts e armas",
+        ("Head of the Legion Beast",),
+        "Boost de dano importante para contas avancadas.",
+        92,
+        "S",
+    ),
+    FarmDefinition(
+        "Infernal Flame Khopesh",
+        "Boosts e armas",
+        ("Infernal Flame Khopesh",),
+        "Marco relevante de boost e dano para progressao endgame.",
+        84,
+        "A",
     ),
     FarmDefinition(
         "Hollowborn DoomKnight",
         "Armas e equipamentos",
         ("Hollowborn DoomKnight",),
-        "Conjunto endgame bastante reconhecido.",
+        "Conjunto endgame bastante reconhecido, mas menos estruturante.",
+        68,
+        "B",
     ),
 )
 
 ULTRA_DEFINITIONS: tuple[FarmDefinition, ...] = (
-    FarmDefinition("Chaos Avenger", "Champion Drakath", ("Chaos Avenger",), "Recompensa marcante ligada a ultra progression."),
-    FarmDefinition("Exalted Apotheosis", "Timeinn Ultras", ("Exalted Apotheosis",), "Arma clássica de ultras do Timeinn."),
-    FarmDefinition("Arcana Invoker", "Ultra Dage / endgame", ("Arcana Invoker",), "Classe endgame ligada a conteúdo avançado."),
-    FarmDefinition("Verus DoomKnight", "Ultra Nulgath / Doom", ("Verus DoomKnight",), "Classe endgame associada a conteúdo ultra."),
-    FarmDefinition("Radiant Goddess of War", "Ultra Speaker", ("Radiant Goddess of War",), "Reward icônica associada a ultras recentes."),
-    FarmDefinition("Dauntless", "Forge / Ultras", ("Dauntless",), "Enhancement endgame ligada a progressão de ultras e forge."),
-    FarmDefinition("Valiance", "Forge / Ultras", ("Valiance",), "Enhancement endgame muito buscada."),
-    FarmDefinition("Ravenous", "Forge / Ultras", ("Ravenous",), "Enhancement endgame ligada a conteúdo avançado."),
-    FarmDefinition("Elysium", "Forge / Ultras", ("Elysium",), "Enhancement de caster endgame."),
-    FarmDefinition("Providence", "Forge / Ultras", ("Providence",), "Enhancement defensiva/endgame."),
+    FarmDefinition("Chaos Avenger", "Champion Drakath", ("Chaos Avenger",), "Uma das melhores recompensas de ultra para consolidar a conta.", 100, "S"),
+    FarmDefinition("Exalted Apotheosis", "Timeinn Ultras", ("Exalted Apotheosis",), "Marco central de ultras e conta endgame.", 99, "S"),
+    FarmDefinition("Dauntless", "Forge / Ultras", ("Dauntless",), "Enhancement extremamente impactante no meta atual.", 98, "S"),
+    FarmDefinition("Valiance", "Forge / Ultras", ("Valiance",), "Enhancement muito valiosa e versatil.", 96, "S"),
+    FarmDefinition("Ravenous", "Forge / Ultras", ("Ravenous",), "Enhancement endgame muito forte para contas avancadas.", 94, "S"),
+    FarmDefinition("Verus DoomKnight", "Ultra Nulgath / Doom", ("Verus DoomKnight",), "Classe endgame associada a conteudo ultra.", 93, "S"),
+    FarmDefinition("Arcana Invoker", "Ultra Dage / endgame", ("Arcana Invoker",), "Classe moderna de alto valor para endgame.", 92, "S"),
+    FarmDefinition("Elysium", "Forge / Ultras", ("Elysium",), "Enhancement de caster muito relevante.", 88, "A"),
+    FarmDefinition("Providence", "Forge / Ultras", ("Providence",), "Enhancement defensiva e utilitaria de endgame.", 84, "A"),
+    FarmDefinition("Radiant Goddess of War", "Ultra Speaker", ("Radiant Goddess of War",), "Reward iconica de conteudo ultra recente.", 82, "A"),
 )
 
 
@@ -486,6 +531,32 @@ class AccountLinkRepository:
                 ON profile_snapshots(discord_user_id, recorded_at DESC)
                 """
             )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS observed_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    discord_user_id INTEGER NOT NULL,
+                    aqw_nickname TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    item_name_normalized TEXT NOT NULL,
+                    item_type TEXT NOT NULL,
+                    source_kind TEXT NOT NULL,
+                    max_count INTEGER NOT NULL,
+                    is_ac INTEGER NOT NULL,
+                    is_member INTEGER NOT NULL,
+                    first_seen_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL,
+                    seen_times INTEGER NOT NULL DEFAULT 1,
+                    UNIQUE(discord_user_id, item_name_normalized, item_type, source_kind)
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_observed_items_user_name
+                ON observed_items(discord_user_id, item_name_normalized)
+                """
+            )
             self._connection.commit()
 
     def upsert_link(self, user: discord.abc.User, aqw_nickname: str) -> AccountLink:
@@ -542,6 +613,10 @@ class AccountLinkRepository:
                     "DELETE FROM profile_snapshots WHERE discord_user_id = ?",
                     (user.id,),
                 )
+                self._connection.execute(
+                    "DELETE FROM observed_items WHERE discord_user_id = ?",
+                    (user.id,),
+                )
             self._connection.commit()
 
             row = self._connection.execute(
@@ -563,6 +638,10 @@ class AccountLinkRepository:
             )
             self._connection.execute(
                 "DELETE FROM profile_snapshots WHERE discord_user_id = ?",
+                (user_id,),
+            )
+            self._connection.execute(
+                "DELETE FROM observed_items WHERE discord_user_id = ?",
                 (user_id,),
             )
             self._connection.commit()
@@ -680,6 +759,160 @@ class AccountLinkRepository:
             ).fetchall()
         return [self._row_to_snapshot(row) for row in rows]
 
+    def remember_character_items(self, link: AccountLink, character: AQWCharacterData) -> int:
+        now = utc_now_iso()
+        observed: dict[tuple[str, str, str], tuple[str, int, bool, bool]] = {}
+
+        for item in character.inventory:
+            name = str(item.get("strName", "")).strip()
+            if not name:
+                continue
+
+            item_type = str(item.get("strType", "Item")).strip() or "Item"
+            key = (normalize_lookup_token(name), item_type, "inventory")
+            count = int(item.get("intCount", 1) or 1)
+            observed[key] = (name, count, bool(item.get("bCoins")), bool(item.get("bUpgrade")))
+
+        for slot_name, equipped_name in character.equipped.items():
+            equipped_name = str(equipped_name or "").strip()
+            if not equipped_name or equipped_name == "Nao informado":
+                continue
+
+            item_type = slot_name
+            key = (normalize_lookup_token(equipped_name), item_type, "equipped")
+            observed.setdefault(key, (equipped_name, 1, False, False))
+
+        inserted_or_updated = 0
+        with self._lock:
+            for (normalized_name, item_type, source_kind), (name, count, is_ac, is_member) in observed.items():
+                row = self._connection.execute(
+                    """
+                    SELECT id, max_count, seen_times
+                    FROM observed_items
+                    WHERE discord_user_id = ?
+                      AND item_name_normalized = ?
+                      AND item_type = ?
+                      AND source_kind = ?
+                    """,
+                    (link.discord_user_id, normalized_name, item_type, source_kind),
+                ).fetchone()
+
+                if row:
+                    self._connection.execute(
+                        """
+                        UPDATE observed_items
+                        SET aqw_nickname = ?,
+                            item_name = ?,
+                            max_count = ?,
+                            is_ac = ?,
+                            is_member = ?,
+                            last_seen_at = ?,
+                            seen_times = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            character.display_name,
+                            name,
+                            max(count, row["max_count"]),
+                            int(is_ac),
+                            int(is_member),
+                            now,
+                            row["seen_times"] + 1,
+                            row["id"],
+                        ),
+                    )
+                else:
+                    self._connection.execute(
+                        """
+                        INSERT INTO observed_items (
+                            discord_user_id,
+                            aqw_nickname,
+                            item_name,
+                            item_name_normalized,
+                            item_type,
+                            source_kind,
+                            max_count,
+                            is_ac,
+                            is_member,
+                            first_seen_at,
+                            last_seen_at,
+                            seen_times
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            link.discord_user_id,
+                            character.display_name,
+                            name,
+                            normalized_name,
+                            item_type,
+                            source_kind,
+                            count,
+                            int(is_ac),
+                            int(is_member),
+                            now,
+                            now,
+                            1,
+                        ),
+                    )
+                inserted_or_updated += 1
+
+            self._connection.commit()
+
+        return inserted_or_updated
+
+    def list_observed_item_matches(self, user_id: int, query: str, limit: int = 20) -> list[ObservedItem]:
+        token = normalize_lookup_token(query)
+        if not token:
+            return []
+
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT *
+                FROM observed_items
+                WHERE discord_user_id = ?
+                  AND item_name_normalized LIKE ?
+                ORDER BY last_seen_at DESC, seen_times DESC, item_name COLLATE NOCASE ASC
+                LIMIT ?
+                """,
+                (user_id, f"%{token}%", limit),
+            ).fetchall()
+        return [self._row_to_observed_item(row) for row in rows]
+
+    def list_observed_items(self, user_id: int, limit: Optional[int] = None) -> list[ObservedItem]:
+        with self._lock:
+            if limit is None:
+                rows = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM observed_items
+                    WHERE discord_user_id = ?
+                    ORDER BY last_seen_at DESC, item_name COLLATE NOCASE ASC
+                    """,
+                    (user_id,),
+                ).fetchall()
+            else:
+                rows = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM observed_items
+                    WHERE discord_user_id = ?
+                    ORDER BY last_seen_at DESC, item_name COLLATE NOCASE ASC
+                    LIMIT ?
+                    """,
+                    (user_id, limit),
+                ).fetchall()
+        return [self._row_to_observed_item(row) for row in rows]
+
+    def count_observed_items(self, user_id: int) -> int:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT COUNT(*) AS total FROM observed_items WHERE discord_user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return int(row["total"]) if row else 0
+
     @staticmethod
     def _row_to_link(row: sqlite3.Row) -> AccountLink:
         return AccountLink(
@@ -705,6 +938,22 @@ class AccountLinkRepository:
             top_class_rank=row["top_class_rank"],
             recorded_at=row["recorded_at"],
             source=row["source"],
+        )
+
+    @staticmethod
+    def _row_to_observed_item(row: sqlite3.Row) -> ObservedItem:
+        return ObservedItem(
+            discord_user_id=row["discord_user_id"],
+            aqw_nickname=row["aqw_nickname"],
+            item_name=row["item_name"],
+            item_type=row["item_type"],
+            source_kind=row["source_kind"],
+            max_count=row["max_count"],
+            is_ac=bool(row["is_ac"]),
+            is_member=bool(row["is_member"]),
+            first_seen_at=row["first_seen_at"],
+            last_seen_at=row["last_seen_at"],
+            seen_times=row["seen_times"],
         )
 
 
@@ -1286,7 +1535,16 @@ def format_snapshot_label(recorded_at: str) -> str:
         return recorded_at.replace("T", " ")[:16]
 
 
-def build_search_pool(character: AQWCharacterData) -> list[tuple[str, str, str]]:
+def format_goal_label(definition: FarmDefinition) -> str:
+    return f"[{definition.tier}] {definition.name}"
+
+
+def build_search_pool(
+    character: AQWCharacterData,
+    link: Optional[AccountLink] = None,
+    *,
+    include_observed: bool = False,
+) -> list[tuple[str, str, str]]:
     pool: list[tuple[str, str, str]] = []
 
     for source, value in character.equipped.items():
@@ -1302,11 +1560,27 @@ def build_search_pool(character: AQWCharacterData) -> list[tuple[str, str, str]]
         if badge.title:
             pool.append((f"Badge ({badge.category})", badge.title, normalize_lookup_token(badge.title)))
 
+    if include_observed and link is not None:
+        for item in link_repository.list_observed_items(link.discord_user_id):
+            pool.append(
+                (
+                    f"Memoria ({item.source_kind}/{item.item_type})",
+                    item.item_name,
+                    normalize_lookup_token(item.item_name),
+                )
+            )
+
     return pool
 
 
-def detect_progress(character: AQWCharacterData, definitions: tuple[FarmDefinition, ...]) -> list[FarmStatus]:
-    pool = build_search_pool(character)
+def detect_progress(
+    character: AQWCharacterData,
+    definitions: tuple[FarmDefinition, ...],
+    link: Optional[AccountLink] = None,
+    *,
+    include_observed: bool = False,
+) -> list[FarmStatus]:
+    pool = build_search_pool(character, link, include_observed=include_observed)
     detected: list[FarmStatus] = []
 
     for definition in definitions:
@@ -1336,7 +1610,21 @@ def detect_ultras(character: AQWCharacterData) -> list[FarmStatus]:
     return detect_progress(character, ULTRA_DEFINITIONS)
 
 
-def search_profile_entries(character: AQWCharacterData, query: str) -> list[tuple[str, str]]:
+def detect_linked_farms(character: AQWCharacterData, link: AccountLink) -> list[FarmStatus]:
+    return detect_progress(character, FARM_DEFINITIONS, link, include_observed=True)
+
+
+def detect_linked_ultras(character: AQWCharacterData, link: AccountLink) -> list[FarmStatus]:
+    return detect_progress(character, ULTRA_DEFINITIONS, link, include_observed=True)
+
+
+def search_profile_entries(
+    character: AQWCharacterData,
+    query: str,
+    link: Optional[AccountLink] = None,
+    *,
+    include_observed: bool = False,
+) -> list[tuple[str, str]]:
     token = normalize_lookup_token(query)
     if not token:
         return []
@@ -1344,7 +1632,7 @@ def search_profile_entries(character: AQWCharacterData, query: str) -> list[tupl
     matches: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
 
-    for source, original_name, normalized_name in build_search_pool(character):
+    for source, original_name, normalized_name in build_search_pool(character, link, include_observed=include_observed):
         if token not in normalized_name:
             continue
 
@@ -1358,15 +1646,21 @@ def search_profile_entries(character: AQWCharacterData, query: str) -> list[tupl
     return matches
 
 
-def prioritize_missing_goals(character: AQWCharacterData) -> tuple[list[FarmStatus], list[FarmStatus]]:
-    ultras = detect_ultras(character)
-    farms = detect_farms(character)
-    missing_ultras = [ultra for ultra in ultras if not ultra.completed]
+def prioritize_missing_goals(character: AQWCharacterData, link: Optional[AccountLink] = None) -> tuple[list[FarmStatus], list[FarmStatus]]:
+    ultras = detect_linked_ultras(character, link) if link else detect_ultras(character)
+    farms = detect_linked_farms(character, link) if link else detect_farms(character)
+    missing_ultras = sorted(
+        [ultra for ultra in ultras if not ultra.completed],
+        key=lambda ultra: (-ultra.definition.priority, ultra.definition.name.lower()),
+    )
     missing_ultras_names = {ultra.definition.name for ultra in missing_ultras}
-    missing_farms = [
-        farm for farm in farms
-        if not farm.completed and farm.definition.name not in missing_ultras_names
-    ]
+    missing_farms = sorted(
+        [
+            farm for farm in farms
+            if not farm.completed and farm.definition.name not in missing_ultras_names
+        ],
+        key=lambda farm: (-farm.definition.priority, farm.definition.name.lower()),
+    )
     return missing_ultras, missing_farms
 
 
@@ -1479,12 +1773,19 @@ def build_profile_embeds(
     portrait_attachment_name: Optional[str] = None,
 ) -> dict[str, discord.Embed]:
     stats = profile_stats(character)
-    farms = detect_farms(character)
-    ultras = detect_ultras(character)
-    completed_farms = [farm for farm in farms if farm.completed]
+    observed_bank_total = link_repository.count_observed_items(link.discord_user_id)
+    farms = detect_linked_farms(character, link)
+    ultras = detect_linked_ultras(character, link)
+    completed_farms = sorted(
+        [farm for farm in farms if farm.completed],
+        key=lambda farm: (-farm.definition.priority, farm.definition.name.lower()),
+    )
     pending_farms = [farm for farm in farms if not farm.completed]
-    completed_ultras = [ultra for ultra in ultras if ultra.completed]
-    pending_ultras, prioritized_farms = prioritize_missing_goals(character)
+    completed_ultras = sorted(
+        [ultra for ultra in ultras if ultra.completed],
+        key=lambda ultra: (-ultra.definition.priority, ultra.definition.name.lower()),
+    )
+    pending_ultras, prioritized_farms = prioritize_missing_goals(character, link)
     classes = ranked_classes(character)
     badge_counts = badge_category_counts(character)
     type_counts = inventory_type_counts(character)
@@ -1513,6 +1814,7 @@ def build_profile_embeds(
                 f"- Tipos de itens detectados: {stats['type_total']}",
                 f"- Classes no inventario: {stats['class_total']}",
                 f"- Badges/conquistas: {stats['badge_total']}",
+                f"- Itens lembrados pelo bot: {observed_bank_total}",
                 f"- Itens AC: {stats['ac_total']}",
                 f"- Itens Member: {stats['member_total']}",
                 f"- Farms detectadas: {len(completed_farms)}/{len(farms)}",
@@ -1543,8 +1845,11 @@ def build_profile_embeds(
         inline=False,
     )
     summary.add_field(
-        name="Status do Bank",
-        value=public_bank_status_text(),
+        name="Bank observado",
+        value=(
+            f"O bot ja memorizou **{observed_bank_total}** item(ns) unico(s) dessa conta com base nas leituras publicas.\n"
+            f"{public_bank_status_text()}"
+        ),
         inline=False,
     )
     summary.set_footer(text=f"Vinculado em {link.created_at} | Atualizado em {link.updated_at}")
@@ -1565,7 +1870,7 @@ def build_profile_embeds(
         name="Concluidas",
         value=build_field_value(
             [
-                f"- {farm.definition.name} ({farm.definition.category})"
+                f"- {format_goal_label(farm.definition)} ({farm.definition.category})"
                 + (f" via {farm.source}: {farm.matched_name}" if farm.source and farm.matched_name else "")
                 for farm in completed_farms
             ],
@@ -1576,14 +1881,14 @@ def build_profile_embeds(
     farms_embed.add_field(
         name="Pendentes",
         value=build_field_value(
-            [f"- {farm.definition.name} ({farm.definition.category})" for farm in pending_farms],
+            [f"- {format_goal_label(farm.definition)} ({farm.definition.category})" for farm in pending_farms],
             fallback="Todas as farms monitoradas foram detectadas.",
         ),
         inline=False,
     )
     farms_embed.add_field(
         name="Sugestao de uso",
-        value=build_field_value([f"- {farm.definition.name}: {farm.definition.note}" for farm in pending_farms[:6]]),
+        value=build_field_value([f"- {format_goal_label(farm.definition)}: {farm.definition.note}" for farm in pending_farms[:6]]),
         inline=False,
     )
 
@@ -1693,7 +1998,7 @@ def build_profile_embeds(
         name="Concluidas",
         value=build_field_value(
             [
-                f"- {ultra.definition.name} ({ultra.definition.category})"
+                f"- {format_goal_label(ultra.definition)} ({ultra.definition.category})"
                 + (f" via {ultra.source}: {ultra.matched_name}" if ultra.source and ultra.matched_name else "")
                 for ultra in completed_ultras
             ],
@@ -1704,7 +2009,7 @@ def build_profile_embeds(
     ultras_embed.add_field(
         name="Pendentes",
         value=build_field_value(
-            [f"- {ultra.definition.name} ({ultra.definition.category})" for ultra in ultras if not ultra.completed],
+            [f"- {format_goal_label(ultra.definition)} ({ultra.definition.category})" for ultra in ultras if not ultra.completed],
             fallback="Todas as metas de ultra monitoradas foram detectadas.",
         ),
         inline=False,
@@ -1815,9 +2120,10 @@ def build_achievements_embed(
 
 
 def build_goals_embed(character: AQWCharacterData, target_user: discord.abc.User) -> discord.Embed:
-    pending_ultras, pending_farms = prioritize_missing_goals(character)
-    completed_farms = len([farm for farm in detect_farms(character) if farm.completed])
-    completed_ultras = len([ultra for ultra in detect_ultras(character) if ultra.completed])
+    link = link_repository.get_link(target_user.id)
+    pending_ultras, pending_farms = prioritize_missing_goals(character, link)
+    completed_farms = len([farm for farm in (detect_linked_farms(character, link) if link else detect_farms(character)) if farm.completed])
+    completed_ultras = len([ultra for ultra in (detect_linked_ultras(character, link) if link else detect_ultras(character)) if ultra.completed])
 
     embed = discord.Embed(
         title=f"Metas endgame de {character.display_name}",
@@ -1833,7 +2139,7 @@ def build_goals_embed(character: AQWCharacterData, target_user: discord.abc.User
     embed.add_field(
         name="Ultras para perseguir agora",
         value=build_field_value(
-            [f"- {ultra.definition.name}: {ultra.definition.note}" for ultra in pending_ultras[:10]],
+            [f"- {format_goal_label(ultra.definition)}: {ultra.definition.note}" for ultra in pending_ultras[:10]],
             fallback="Nenhuma pendencia de ultra detectada.",
         ),
         inline=False,
@@ -1841,9 +2147,14 @@ def build_goals_embed(character: AQWCharacterData, target_user: discord.abc.User
     embed.add_field(
         name="Farms recomendadas",
         value=build_field_value(
-            [f"- {farm.definition.name}: {farm.definition.note}" for farm in pending_farms[:10]],
+            [f"- {format_goal_label(farm.definition)}: {farm.definition.note}" for farm in pending_farms[:10]],
             fallback="As farms monitoradas ja foram detectadas no perfil publico.",
         ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Leitura inteligente",
+        value="As metas agora sao ordenadas por prioridade e tier, em vez de apenas ordem fixa de lista.",
         inline=False,
     )
     embed.add_field(name="Status do Bank", value=public_bank_status_text(), inline=False)
@@ -1852,11 +2163,13 @@ def build_goals_embed(character: AQWCharacterData, target_user: discord.abc.User
 
 def build_classes_embed(character: AQWCharacterData, target_user: discord.abc.User) -> discord.Embed:
     classes = ranked_classes(character)
+    link = link_repository.get_link(target_user.id)
     meta_classes = [
-        farm.definition.name
-        for farm in detect_farms(character)
+        farm.definition
+        for farm in (detect_linked_farms(character, link) if link else detect_farms(character))
         if farm.completed and farm.definition.category == "Classes de farm"
     ]
+    meta_classes.sort(key=lambda definition: (-definition.priority, definition.name.lower()))
 
     embed = discord.Embed(
         title=f"Classes de {character.display_name}",
@@ -1880,7 +2193,7 @@ def build_classes_embed(character: AQWCharacterData, target_user: discord.abc.Us
     embed.add_field(
         name="Classes meta detectadas",
         value=build_field_value(
-            [f"- {name}" for name in meta_classes],
+            [f"- {format_goal_label(definition)}" for definition in meta_classes],
             fallback="Nenhuma classe meta monitorada foi detectada.",
         ),
         inline=False,
@@ -1892,9 +2205,16 @@ def build_classes_embed(character: AQWCharacterData, target_user: discord.abc.Us
 def build_item_search_embed(
     character: AQWCharacterData,
     target_user: discord.abc.User,
+    link: AccountLink,
     query: str,
 ) -> discord.Embed:
-    matches = search_profile_entries(character, query)
+    matches = search_profile_entries(character, query, link, include_observed=False)
+    historical = link_repository.list_observed_item_matches(link.discord_user_id, query, limit=20)
+    current_names = {normalize_lookup_token(name) for _, name in matches}
+    remembered_only = [
+        item for item in historical
+        if normalize_lookup_token(item.item_name) not in current_names
+    ]
 
     embed = discord.Embed(
         title=f"Busca no perfil de {character.display_name}",
@@ -1902,17 +2222,34 @@ def build_item_search_embed(
         description=(
             f"**Discord:** {target_user.mention}\n"
             f"**Busca:** `{query}`\n"
-            f"**Resultados:** {len(matches)}"
+            f"**No perfil atual:** {len(matches)}\n"
+            f"**Na memoria do bot:** {len(remembered_only)}"
         ),
         color=discord.Color.teal(),
     )
     embed.set_author(name=safe_user_display(target_user), icon_url=target_user.display_avatar.url)
     embed.add_field(
-        name="Ocorrencias",
+        name="Ocorrencias atuais",
         value=build_field_value(
             [f"- {source}: {name}" for source, name in matches[:20]],
             fallback="Nada correspondente foi encontrado no inventario, equipados ou badges publicos.",
         ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Itens lembrados pelo bot",
+        value=build_field_value(
+            [
+                f"- {item.item_name} [{item.item_type}/{item.source_kind}] | visto {item.seen_times}x | ultimo {format_snapshot_label(item.last_seen_at)}"
+                for item in remembered_only[:20]
+            ],
+            fallback="Nenhum item correspondente foi encontrado na memoria historica do bot.",
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Bank observado",
+        value="Tudo que o bot ja viu publicamente nesse personagem vai sendo guardado para reconstruir um banco historico.",
         inline=False,
     )
     embed.add_field(name="Status do Bank", value=public_bank_status_text(), inline=False)
@@ -1927,8 +2264,10 @@ def build_compare_embed(
 ) -> discord.Embed:
     left_stats = profile_stats(left_character)
     right_stats = profile_stats(right_character)
-    left_farms = detect_farms(left_character)
-    right_farms = detect_farms(right_character)
+    left_link = link_repository.get_link(left_user.id)
+    right_link = link_repository.get_link(right_user.id)
+    left_farms = detect_linked_farms(left_character, left_link) if left_link else detect_farms(left_character)
+    right_farms = detect_linked_farms(right_character, right_link) if right_link else detect_farms(right_character)
     left_completed = {farm.definition.name for farm in left_farms if farm.completed}
     right_completed = {farm.definition.name for farm in right_farms if farm.completed}
     left_classes = ranked_classes(left_character)
@@ -1977,9 +2316,16 @@ def build_compare_embed(
 
 
 def build_ultras_embed(character: AQWCharacterData, target_user: discord.abc.User) -> discord.Embed:
-    ultras = detect_ultras(character)
-    completed = [ultra for ultra in ultras if ultra.completed]
-    pending = [ultra for ultra in ultras if not ultra.completed]
+    link = link_repository.get_link(target_user.id)
+    ultras = detect_linked_ultras(character, link) if link else detect_ultras(character)
+    completed = sorted(
+        [ultra for ultra in ultras if ultra.completed],
+        key=lambda ultra: (-ultra.definition.priority, ultra.definition.name.lower()),
+    )
+    pending = sorted(
+        [ultra for ultra in ultras if not ultra.completed],
+        key=lambda ultra: (-ultra.definition.priority, ultra.definition.name.lower()),
+    )
 
     embed = discord.Embed(
         title=f"Ultras de {character.display_name}",
@@ -1995,7 +2341,7 @@ def build_ultras_embed(character: AQWCharacterData, target_user: discord.abc.Use
         name="Concluidas",
         value=build_field_value(
             [
-                f"- {ultra.definition.name}"
+                f"- {format_goal_label(ultra.definition)}"
                 + (f" via {ultra.source}: {ultra.matched_name}" if ultra.source and ultra.matched_name else "")
                 for ultra in completed
             ],
@@ -2006,7 +2352,7 @@ def build_ultras_embed(character: AQWCharacterData, target_user: discord.abc.Use
     embed.add_field(
         name="Pendentes",
         value=build_field_value(
-            [f"- {ultra.definition.name}" for ultra in pending],
+            [f"- {format_goal_label(ultra.definition)}" for ultra in pending],
             fallback="Nenhuma pendencia de ultra detectada.",
         ),
         inline=False,
@@ -2022,6 +2368,7 @@ def build_history_embed(
 ) -> discord.Embed:
     latest = snapshots[0] if snapshots else None
     oldest = snapshots[-1] if len(snapshots) > 1 else latest
+    observed_bank_total = link_repository.count_observed_items(link.discord_user_id)
 
     embed = discord.Embed(
         title=f"Historico AQW de {safe_user_display(target_user)}",
@@ -2050,6 +2397,7 @@ def build_history_embed(
                     f"- Ultras detectadas: {latest.ultra_total} ({delta_ultras:+d})",
                     f"- Classes detectadas: {latest.class_total}",
                     f"- Melhor classe: {latest.top_class_name} (Rank {latest.top_class_rank})",
+                    f"- Itens lembrados pelo bot: {observed_bank_total}",
                 ]
             ),
             inline=False,
@@ -2110,6 +2458,7 @@ async def gather_linked_guild_profiles(
                     False,
                 )
                 await asyncio.to_thread(link_repository.record_snapshot, link, character, "guild-scan")
+                await asyncio.to_thread(link_repository.remember_character_items, link, character)
             except Exception:
                 logger.exception("Falha ao montar perfil AQW vinculado de %s (%s).", member.display_name, member.id)
                 return None
@@ -2126,9 +2475,9 @@ def build_rankingfarms_embed(
     entries: list[tuple[discord.Member, AccountLink, AQWCharacterData]],
 ) -> discord.Embed:
     ranking = []
-    for member, _, character in entries:
-        farm_count = len([farm for farm in detect_farms(character) if farm.completed])
-        ultra_count = len([ultra for ultra in detect_ultras(character) if ultra.completed])
+    for member, link, character in entries:
+        farm_count = len([farm for farm in detect_linked_farms(character, link) if farm.completed])
+        ultra_count = len([ultra for ultra in detect_linked_ultras(character, link) if ultra.completed])
         ranking.append((member, character, farm_count, ultra_count))
 
     ranking.sort(
@@ -2163,13 +2512,18 @@ def build_topclasses_embed(
     entries: list[tuple[discord.Member, AccountLink, AQWCharacterData]],
 ) -> discord.Embed:
     ranking = []
-    for member, _, character in entries:
+    for member, link, character in entries:
         best_rank, class_total, total_points, top_class_name = class_leaderboard_metrics(character)
-        ranking.append((member, character, best_rank, class_total, total_points, top_class_name))
+        meta_bonus = len([
+            farm for farm in detect_linked_farms(character, link)
+            if farm.completed and farm.definition.category == "Classes de farm"
+        ])
+        ranking.append((member, character, best_rank, class_total, total_points, top_class_name, meta_bonus))
 
     ranking.sort(
         key=lambda entry: (
             -entry[2],
+            -entry[6],
             -entry[3],
             -entry[4],
             entry[1].display_name.lower(),
@@ -2185,8 +2539,8 @@ def build_topclasses_embed(
         name="Ranking de classes",
         value=build_field_value(
             [
-                f"- #{index} {member.display_name} -> {character.display_name} | Melhor classe {top_class_name} (Rank {best_rank}) | Classes {class_total}"
-                for index, (member, character, best_rank, class_total, _, top_class_name) in enumerate(ranking[:15], start=1)
+                f"- #{index} {member.display_name} -> {character.display_name} | Melhor classe {top_class_name} (Rank {best_rank}) | Classes {class_total} | Metas de classe {meta_bonus}"
+                for index, (member, character, best_rank, class_total, _, top_class_name, meta_bonus) in enumerate(ranking[:15], start=1)
             ],
             fallback="Nenhum usuario vinculado encontrado nesta guild.",
         ),
@@ -2204,7 +2558,7 @@ def build_badges_ranking_embed(
         entries,
         key=lambda entry: (
             -len(entry[2].badges),
-            -len([farm for farm in detect_farms(entry[2]) if farm.completed]),
+            -len([farm for farm in detect_linked_farms(entry[2], entry[1]) if farm.completed]),
             entry[2].display_name.lower(),
         ),
     )
@@ -2241,9 +2595,9 @@ def build_guildaqw_embed(
         color=discord.Color.blue(),
     )
     lines = []
-    for member, _, character in ordered[:20]:
-        farm_count = len([farm for farm in detect_farms(character) if farm.completed])
-        ultra_count = len([ultra for ultra in detect_ultras(character) if ultra.completed])
+    for member, link, character in ordered[:20]:
+        farm_count = len([farm for farm in detect_linked_farms(character, link) if farm.completed])
+        ultra_count = len([ultra for ultra in detect_linked_ultras(character, link) if ultra.completed])
         lines.append(
             f"- {member.display_name} -> {character.display_name} | Lv {character.level} | Farms {farm_count} | Ultras {ultra_count} | Badges {len(character.badges)}"
         )
@@ -2275,6 +2629,7 @@ async def resolve_linked_profile(
         force_refresh,
     )
     await asyncio.to_thread(link_repository.record_snapshot, link, character, "profile")
+    await asyncio.to_thread(link_repository.remember_character_items, link, character)
     return link, character
 
 
@@ -2304,6 +2659,10 @@ async def send_public_character_panel(interaction: discord.Interaction, nickname
 
     try:
         character = await asyncio.to_thread(aqw_service.fetch_character, nickname, True, False)
+        viewer_link = link_repository.get_link(interaction.user.id)
+        if viewer_link and normalize_lookup_token(viewer_link.aqw_nickname) == normalize_lookup_token(character.display_name):
+            await asyncio.to_thread(link_repository.record_snapshot, viewer_link, character, "panel")
+            await asyncio.to_thread(link_repository.remember_character_items, viewer_link, character)
         embed, file = build_character_embed(character, interaction.user)
 
         if target_channel:
@@ -2680,6 +3039,7 @@ async def vincular(interaction: discord.Interaction, nickname: str) -> None:
         )
         link = link_repository.upsert_link(interaction.user, character.display_name)
         await asyncio.to_thread(link_repository.record_snapshot, link, character, "link")
+        await asyncio.to_thread(link_repository.remember_character_items, link, character)
 
         embed = discord.Embed(
             title="Conta vinculada com sucesso",
@@ -2910,8 +3270,8 @@ async def buscaritem(
     await interaction.response.defer(thinking=True)
 
     try:
-        _, character = await resolve_linked_profile(target)
-        embed = build_item_search_embed(character, target, termo)
+        link, character = await resolve_linked_profile(target)
+        embed = build_item_search_embed(character, target, link, termo)
         await interaction.edit_original_response(embed=embed)
     except AQWCharacterUnavailable as exc:
         await interaction.edit_original_response(content=str(exc), embed=None)

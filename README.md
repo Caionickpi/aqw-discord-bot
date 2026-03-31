@@ -136,6 +136,12 @@ Também há um histórico simples por usuário vinculado, salvo em SQLite, com:
 - ultras detectadas;
 - melhor classe detectada.
 
+Além disso, o bot mantém um `bank observado`:
+
+- todo item público visto no inventário/equipados de um personagem vinculado é memorizado;
+- mesmo que o item suma do inventário atual, ele continua pesquisável em `/buscaritem`;
+- com o tempo, essa memória vai aproximando um espelho parcial do banco real da conta.
+
 ## Stack
 
 - Python 3.10+
