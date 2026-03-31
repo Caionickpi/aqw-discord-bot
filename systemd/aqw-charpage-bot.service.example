@@ -1,0 +1,16 @@
+[Unit]
+Description=AQW Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=umbrel
+WorkingDirectory=/home/umbrel/aqw_charpage_bot
+EnvironmentFile=/home/umbrel/aqw_charpage_bot/.env
+ExecStart=/home/umbrel/aqw_charpage_bot/.venv/bin/python /home/umbrel/aqw_charpage_bot/bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

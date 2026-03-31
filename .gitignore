@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+aqw_links.db
+profile_art/
+*.log
+
+# Capturas e artefatos locais de teste
+artix-page*.png
+caio-*.png
+remote-*.png
+style-preview-artix.png
+
+# Ferramenta local usada como skill/processo, nao faz parte do bot
+get-shit-done/
